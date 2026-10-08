@@ -1,0 +1,96 @@
+{
+  "timestamp": 1791419843.483608,
+  "suites_results": {
+    "suite_01_digital_pdf": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 0.4234,
+      "blocks_extracted": 9,
+      "tables_detected": 0
+    },
+    "suite_02_scanned_pdf": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 7.7678,
+      "blocks_extracted": 5,
+      "tables_detected": 0
+    },
+    "suite_03_two_column_pdf": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 0.0165,
+      "blocks_extracted": 12,
+      "tables_detected": 0
+    },
+    "suite_04_complex_table_pdf": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 0.0094,
+      "blocks_extracted": 8,
+      "tables_detected": 0
+    },
+    "suite_05_multipage_table_pdf": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 0.1027,
+      "blocks_extracted": 51,
+      "tables_detected": 0
+    },
+    "suite_06_chart_pdf": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 0.0092,
+      "blocks_extracted": 4,
+      "tables_detected": 0
+    },
+    "suite_07_equation_pdf": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 1.6741,
+      "blocks_extracted": 8,
+      "tables_detected": 0
+    },
+    "suite_08_word_docx": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 0.0127,
+      "blocks_extracted": 8,
+      "tables_detected": 1
+    },
+    "suite_09_presentation_pptx": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 0.0096,
+      "blocks_extracted": 4,
+      "tables_detected": 1
+    },
+    "suite_10_spreadsheet_xlsx": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 0.0038,
+      "blocks_extracted": 4,
+      "tables_detected": 2
+    },
+    "suite_11_image_png": {
+      "status": "Executed",
+      "result_summary": "Completed",
+      "latency_seconds": 12.7681,
+      "blocks_extracted": 17,
+      "tables_detected": 0
+    },
+    "suite_12_corrupt_pdf": {
+      "status": "Executed",
+      "result_summary": "Failed (ErrorCode.PARSER_FAILURE)",
+      "latency_seconds": 0.0008,
+      "blocks_extracted": 0,
+      "tables_detected": 0
+    },
+    "suite_13_unsupported_bin": {
+      "status": "Executed",
+      "result_summary": "Failed (ErrorCode.UNSUPPORTED_FORMAT)",
+      "latency_seconds": 0.0002,
+      "blocks_extracted": 0,
+      "tables_detected": 0
+    }
+  }
+}

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ParseAnything — High-Fidelity Universal Document Ingestion Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-logo">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-title">PARSEANYTHING</span>
+        <span class="brand-subtitle">Universal Document Ingestion Engine</span>
+      </div>
+    </div>
+
+    <!-- Active Pipeline Stage Indicator -->
+    <div class="pipeline-stepper" id="pipelineStepper">
+      <div class="step-node active" id="stepUpload"><span class="step-dot"></span> Upload</div>
+      <div class="step-arrow">→</div>
+      <div class="step-node" id="stepDetect"><span class="step-dot"></span> Detect & Route</div>
+      <div class="step-arrow">→</div>
+      <div class="step-node" id="stepExtract"><span class="step-dot"></span> Extract</div>
+      <div class="step-arrow">→</div>
+      <div class="step-node" id="stepAssemble"><span class="step-dot"></span> Assemble & Order</div>
+      <div class="step-arrow">→</div>
+      <div class="step-node" id="stepVerify"><span class="step-dot"></span> Provenance & Safe</div>
+    </div>
+
+    <!-- Header Telemetry Pill -->
+    <div class="header-telemetry">
+      <div class="telemetry-pill">
+        <span class="pill-label">API Cost / 1k:</span>
+        <span class="pill-value text-accent" id="headCostPill">$0.00</span>
+      </div>
+      <div class="telemetry-pill">
+        <span class="pill-label">Speed:</span>
+        <span class="pill-value text-accent" id="headSpeedPill">-- p/s</span>
+      </div>
+      <button class="btn btn-outline btn-sm" id="btnRunBenchmarks">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        Run 13x Benchmarks
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-main">
+    <!-- Ingestion Hero & Demo Selector Strip -->
+    <section class="ingestion-control-panel">
+      <!-- File Dropzone -->
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" class="file-input-hidden" accept=".pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg">
+        <div class="dropzone-content">
+          <div class="dropzone-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+          </div>
+          <div class="dropzone-text">
+            <span class="primary-text">Drag & drop any file to ingest</span>
+            <span class="secondary-text">or <button class="browse-link" id="btnBrowse">browse from computer</button></span>
+          </div>
+          <div class="supported-formats-pills">
+            <span class="badge badge-pdf">PDF</span>
+            <span class="badge badge-docx">DOCX</span>
+            <span class="badge badge-pptx">PPTX</span>
+            <span class="badge badge-xlsx">XLSX</span>
+            <span class="badge badge-img">PNG</span>
+            <span class="badge badge-img">JPG</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Previously Uploaded Files -->
+      <div class="demo-scenarios-panel">
+        <div class="panel-heading">
+          <span class="heading-title">📁 Previously Uploaded Files</span>
+          <span class="heading-subtitle">Quickly access files processed during this session</span>
+        </div>
+        <div class="demo-buttons-grid" id="previousFilesList">
+          <span style="color:var(--text-muted);font-size:12px;padding:8px;">No files uploaded yet.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Document Ingestion Active Banner -->
+    <div class="document-summary-banner" id="docSummaryBanner">
+      <div class="summary-left">
+        <span class="file-icon" id="bannerFormatIcon">📄</span>
+        <div class="file-details">
+          <div class="file-title-row">
+            <h2 class="file-name" id="bannerFilename">Upload a Document</h2>
+            <span class="badge badge-neutral" id="bannerStatus">WAITING</span>
+            <span class="badge badge-neutral" id="bannerFormat">--</span>
+            <span class="badge badge-neutral" id="bannerParser">--</span>
+            <span class="badge badge-neutral" id="bannerPageType" style="display:none;">TYPE</span>
+            <span class="badge" id="bannerHandwriting" style="display:none; border-color:var(--accent-amber); color:var(--accent-amber);">HANDWRITING DETECTED</span>
+          </div>
+          <span class="file-meta-row" id="bannerMeta">Ready to ingest your documents</span>
+        </div>
+      </div>
+      <div class="summary-right">
+        <div class="stat-box">
+          <span class="stat-number text-accent" id="bannerTablesCount">-</span>
+          <span class="stat-label">Tables</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number text-purple" id="bannerFiguresCount">-</span>
+          <span class="stat-label">Figures</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number text-amber" id="bannerEquationsCount">-</span>
+          <span class="stat-label">Equations</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number text-green" id="bannerConfidenceAvg">-</span>
+          <span class="stat-label">Avg Conf</span>
+        </div>
+        <div class="stat-box" style="margin-left: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <button class="btn btn-outline btn-sm" id="btnDownloadBBox" style="border-color: var(--accent-purple); color: var(--accent-purple);" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            PDF
+          </button>
+          <button class="btn btn-outline btn-sm" id="btnDownloadMdMain" style="border-color: var(--accent-amber); color: var(--accent-amber);" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            Markdown (.md)
+          </button>
+          <button class="btn btn-outline btn-sm" id="btnDownloadJsonMain" style="border-color: var(--accent-cyan); color: var(--accent-cyan);" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            JSON
+          </button>
+          <button class="btn btn-primary btn-sm" id="btnDownloadAllMain" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; font-weight: 600; border: none; box-shadow: 0 2px 8px rgba(14,165,233,0.3);" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download All (ZIP)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3-Pane Document Workspace -->
+    <div class="workspace-tri-pane">
+      <!-- PANE 1: Original Document Preview with Interactive Bounding Boxes -->
+      <section class="pane pane-preview" id="panePreview">
+        <div class="pane-header">
+          <div class="pane-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <span>Original Source & BBoxes</span>
+          </div>
+          <div class="page-pagination">
+            <button class="btn btn-icon btn-sm" id="btnZoomOut" title="Zoom Out">-</button>
+            <span class="page-indicator" id="zoomIndicator">100%</span>
+            <button class="btn btn-icon btn-sm" id="btnZoomIn" title="Zoom In">+</button>
+          </div>
+        </div>
+
+        <div class="preview-stage-viewport" id="previewViewport">
+          <!-- Dynamically populated page containers will go here -->
+          <div class="non-visual-fallback" id="nonVisualFallback" style="display:none;">
+            <div class="fallback-card">
+              <span class="fallback-icon">📊</span>
+              <h3>Tabular Spreadsheet View</h3>
+              <p>Provenance coordinates correspond to cell ranges and grid coordinates rather than static raster pages.</p>
+              <div class="cell-range-pill" id="fallbackRangePill">Used Range: A1:D20</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="preview-legend">
+          <span class="legend-item"><span class="legend-dot color-text"></span> Text</span>
+          <span class="legend-item"><span class="legend-dot color-table"></span> Table</span>
+          <span class="legend-item"><span class="legend-dot color-chart"></span> Figure/Chart</span>
+          <span class="legend-item"><span class="legend-dot color-math"></span> Equation</span>
+          <span class="legend-item"><span class="legend-dot color-low"></span> Low Conf</span>
+        </div>
+      </section>
+
+      <!-- PANE 2: Extracted Semantic Blocks & Reconstructed Reading Order -->
+      <section class="pane pane-blocks" id="paneBlocks">
+        <div class="pane-header">
+          <div class="pane-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            <span>Reconstructed Reading Order</span>
+          </div>
+          <span class="badge badge-neutral" id="blocksCountBadge">7 Blocks</span>
+        </div>
+
+        <div class="blocks-stream-list" id="blocksList">
+          <!-- Dynamically populated semantic block cards -->
+        </div>
+      </section>
+
+      <!-- PANE 3: Structured Inspector & Intelligence Tabs -->
+      <section class="pane pane-inspector" id="paneInspector">
+        <div class="inspector-tabs-header">
+          <button class="tab-btn active" data-tab="provenance" id="tabBtnProv">Provenance</button>
+          <button class="tab-btn" data-tab="markdown" id="tabBtnMd">Markdown</button>
+          <button class="tab-btn" data-tab="json" id="tabBtnJson">JSON</button>
+          <button class="tab-btn" data-tab="tables" id="tabBtnTbl">Tables</button>
+          <button class="tab-btn" data-tab="charts" id="tabBtnCharts">Charts</button>
+          <button class="tab-btn" data-tab="equations" id="tabBtnEquations">Equations</button>
+          <button class="tab-btn" data-tab="telemetry" id="tabBtnTel">Cost & Speed</button>
+        </div>
+
+        <div class="inspector-tab-content">
+          <!-- Tab 1: Provenance Inspector (Star Differentiator) -->
+          <div class="tab-pane active" id="tabProvenance">
+            <div class="provenance-focus-card" id="provFocusCard">
+              <div class="card-badge-row">
+                <span class="badge badge-method" id="provMethodBadge">PDF Text Extractor</span>
+                <span class="badge badge-success" id="provConfBadge">98% High Confidence</span>
+                <span class="badge badge-order" id="provOrderBadge">Reading Order: #1</span>
+              </div>
+              <h3 class="prov-block-title" id="provBlockTitle">No Block Selected</h3>
+              <p class="prov-content-snippet" id="provSnippet">Click a semantic block to inspect its provenance.</p>
+
+              <div class="prov-coordinates-box">
+                <div class="coord-item">
+                  <span class="coord-label">Source Document</span>
+                  <span class="coord-value" id="provDocVal">--</span>
+                </div>
+                <div class="coord-item">
+                  <span class="coord-label">Page / Slide / Sheet</span>
+                  <span class="coord-value" id="provPageVal">--</span>
+                </div>
+                <div class="coord-item">
+                  <span class="coord-label">Block ID & Type</span>
+                  <span class="coord-value" id="provBlockIdVal">--</span>
+                </div>
+                <div class="coord-item">
+                  <span class="coord-label">Model / Engine</span>
+                  <span class="coord-value" id="provModelVal">--</span>
+                </div>
+                <div class="coord-item">
+                  <span class="coord-label">Confidence & Review</span>
+                  <span class="coord-value" id="provReviewVal">--</span>
+                </div>
+                <div class="coord-item">
+                  <span class="coord-label">Bounding Box Coordinates</span>
+                  <span class="coord-value code-font" id="provBBoxVal">--</span>
+                </div>
+                <div class="coord-item">
+                  <span class="coord-label">Extraction Pipeline Layer</span>
+                  <span class="coord-value" id="provLayerVal">--</span>
+                </div>
+                <div class="coord-item" id="provEquationExtra" style="display:none; grid-column: span 2;">
+                  <span class="coord-label">Equation ID & LaTeX</span>
+                  <span class="coord-value code-font" id="provEquationVal" style="white-space: pre-wrap; word-break: break-all;">--</span>
+                </div>
+              </div>
+
+              <div class="prov-signals-box">
+                <span class="signals-title">Confidence Signal Breakdown:</span>
+                <div class="signal-bar-row">
+                  <span>Font & Geometry Validity</span>
+                  <div class="prog-bar"><div class="prog-fill" style="width: 100%;"></div></div>
+                  <span class="sig-val">100%</span>
+                </div>
+                <div class="signal-bar-row">
+                  <span>Layout & Column Alignment</span>
+                  <div class="prog-bar"><div class="prog-fill" style="width: 98%;"></div></div>
+                  <span class="sig-val">98%</span>
+                </div>
+                <div class="signal-bar-row">
+                  <span>OCR Noise / Character Entropy</span>
+                  <div class="prog-bar"><div class="prog-fill" style="width: 95%;"></div></div>
+                  <span class="sig-val">0% noise</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Markdown Output -->
+          <div class="tab-pane" id="tabMarkdown">
+            <div class="tab-action-bar">
+              <span class="tab-action-label">Reading-Order Formatted Markdown</span>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-outline btn-xs" id="btnCopyMd">Copy Markdown</button>
+                <button class="btn btn-outline btn-xs" id="btnDownloadMd" style="border-color:var(--accent-amber);color:var(--accent-amber);">Download .md</button>
+              </div>
+            </div>
+            <div class="markdown-preview-box" id="markdownRenderArea"></div>
+          </div>
+
+          <!-- Tab 3: JSON Schema 1.0 -->
+          <div class="tab-pane" id="tabJson">
+            <div class="tab-action-bar">
+              <span class="tab-action-label">Universal IR Schema v1.0</span>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-outline btn-xs" id="btnDownloadProvenance">Download Provenance</button>
+                <button class="btn btn-outline btn-xs" id="btnDownloadJson" style="border-color:var(--accent-cyan);color:var(--accent-cyan);">Download JSON</button>
+              </div>
+            </div>
+            <pre class="json-code-box" id="jsonCodeArea"></pre>
+          </div>
+
+          <!-- Tab 4: Tables Inspector -->
+          <div class="tab-pane" id="tabTables">
+            <div class="tab-action-bar" id="tablesActionBar" style="display:none;margin-bottom:12px;">
+              <span class="tab-action-label" id="tablesActionLabel">Extracted Tables</span>
+              <button class="btn btn-outline btn-xs" id="btnDownloadAllTables" style="border-color:var(--accent-emerald);color:var(--accent-emerald);">Download Tables (.csv)</button>
+            </div>
+            <div id="tablesInspectorList"></div>
+          </div>
+
+          <!-- Tab 5: Charts -->
+          <div class="tab-pane" id="tabCharts">
+            <div class="tab-action-bar" id="chartsActionBar" style="display:none;margin-bottom:12px;">
+              <span class="tab-action-label" id="chartsActionLabel">Extracted Figures & Charts</span>
+              <button class="btn btn-outline btn-xs" id="btnDownloadAllCharts" style="border-color:var(--accent-purple);color:var(--accent-purple);">Download Figures</button>
+            </div>
+            <h3 class="pane-subtitle" style="margin-bottom: 12px;">Extracted Charts & Figures</h3>
+            <div id="chartsViewContainer" style="color: #64748b; font-size: 13px;">
+              Upload a document with charts or figures to see data.
+            </div>
+          </div>
+
+          <!-- Tab 6: Equations Inspector -->
+          <div class="tab-pane" id="tabEquations">
+            <div class="tab-action-bar">
+              <span class="tab-action-label" id="equationsCountHeader">EQUATIONS: 0</span>
+            </div>
+            <div id="equationsInspectorList">
+              <div style="color: var(--text-muted); font-size: 13px; padding: 12px 0;">
+                No mathematical equations detected in this document.
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 6: Real-time Telemetry & Cost -->
+          <div class="tab-pane" id="tabTelemetry">
+            <div class="telemetry-dashboard">
+              <div class="cost-gauge-card">
+                <div class="gauge-title">API Cost per 1,000 Pages</div>
+                <div class="gauge-value text-accent" id="telCostVal">$0.00</div>
+                <div class="gauge-target">Challenge Target: &lt; $10.00 / 1,000 pages</div>
+                <div class="gauge-status badge badge-success">99.9% UNDER BUDGET</div>
+              </div>
+
+              <div class="metrics-stats-grid">
+                <div class="metric-item">
+                  <span class="m-val" id="telSpeedVal">12.5 p/s</span>
+                  <span class="m-lbl">Throughput Speed</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val" id="telPagesVal">1</span>
+                  <span class="m-lbl">Pages Ingested</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val" id="telBlocksVal">7</span>
+                  <span class="m-lbl">Blocks Extracted</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val" id="telLowConfVal">0</span>
+                  <span class="m-lbl">Review Required</span>
+                </div>
+              </div>
+
+              <div class="cascade-breakdown-card">
+                <h5>Cascaded Execution Breakdown:</h5>
+                <div class="cascade-row">
+                  <span class="c-layer">Level 1 (Deterministic Native)</span>
+                  <span class="c-pct">92%</span>
+                </div>
+                <div class="cascade-row">
+                  <span class="c-layer">Level 2 (Specialized Local ML / OCR)</span>
+                  <span class="c-pct">8%</span>
+                </div>
+                <div class="cascade-row">
+                  <span class="c-layer">Level 3 (Vision / LLM Fallback)</span>
+                  <span class="c-pct">0% (Avoided unnecessary API calls)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Modal for Benchmark Results -->
+  <div class="modal-backdrop" id="benchmarkModal" style="display:none;">
+    <div class="modal-card" style="max-width: 960px; width: 95%; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header" style="align-items: flex-start;">
+        <div>
+          <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #fff;">13x Automated Benchmark Suites</h3>
+          <span style="font-size: 12px; color: var(--text-dim); display: block; margin-top: 3px;">Configured automated suites & execution status</span>
+        </div>
+        <button class="btn btn-icon btn-sm" id="btnCloseModal">✕</button>
+      </div>
+      <div class="modal-body" id="modalBenchmarkBody">
+        <div class="loader-spinner">Loading benchmark suites status...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
