@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  parseanything:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: parseanything-engine
+    restart: unless-stopped
+    ports:
+      - "8585:8585"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8585
+      - MAX_COST_TARGET_PER_1K=10.00
+      - VISION_API_COST_PER_PAGE=0.005
+    volumes:
+      - ./data:/app/backend/data
+      - ../test_documents:/app/test_documents
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8585/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
