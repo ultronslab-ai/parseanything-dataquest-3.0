@@ -54,7 +54,7 @@ DOCUMENTS_STORE: Dict[str, Document] = {}
 PIPELINE = ExtractionPipeline()
 COST_MANAGER = CostManager()
 
-TEMP_DIR = BASE_DIR / "backend" / "data"
+TEMP_DIR = Path(tempfile.gettempdir()) / "parseanything_data"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 PAGE_IMAGES_DIR = TEMP_DIR / "page_images"
 PAGE_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -90,17 +90,20 @@ async def upload_document(
     """Ingest any document (PDF, DOCX, PPTX, XLSX, PNG, JPG).
     Detects format, executes 3-stage pipeline, attaches provenance, and returns Document.
     """
+    start_time = time.time()
     doc_id = f"doc_{uuid.uuid4().hex[:8]}"
-    original_name = file.filename or "uploaded_file"
+    raw_name = file.filename or "uploaded_file"
+    original_name = Path(raw_name).name or "uploaded_file"
     suffix = Path(original_name).suffix.lower()
 
-    # Save uploaded file
     target_path = TEMP_DIR / f"{doc_id}_{original_name}"
-    with open(target_path, "wb") as f_out:
-        shutil.copyfileobj(file.file, f_out)
 
-    start_time = time.time()
     try:
+        TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        PAGE_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        with open(target_path, "wb") as f_out:
+            shutil.copyfileobj(file.file, f_out)
+
         # Run 3-stage extraction pipeline
         doc = PIPELINE.process(
             file_path=target_path,
@@ -146,8 +149,34 @@ async def upload_document(
             processing_status="failed",
             errors=[err]
         )
-        DOCUMENTS_STORE[doc_id] = fail_doc
         return fail_doc
+
+
+@app.post("/api/v1/documents/sample/{filename}")
+def process_sample_document(filename: str):
+    """Processes a bundled sample test document directly without client upload."""
+    from benchmarks.suites_config import find_dataset_file
+    clean_name = Path(filename).name
+    p = find_dataset_file(clean_name)
+    if not p or not p.exists():
+        p = BASE_DIR / "test_documents" / clean_name
+    if not p or not p.exists():
+        p = BASE_DIR / clean_name
+    if not p or not p.exists():
+        raise HTTPException(status_code=404, detail=f"Sample document '{clean_name}' not found")
+
+    try:
+        doc_id = f"doc_{uuid.uuid4().hex[:8]}"
+        doc = PIPELINE.process(p, document_id=doc_id)
+        doc.filename = clean_name
+        DOCUMENTS_STORE[doc_id] = doc
+        SYSTEM_STATS["total_documents_processed"] += 1
+        SYSTEM_STATS["total_pages_processed"] += doc.stats.pages_processed
+        SYSTEM_STATS["total_blocks_extracted"] += doc.stats.blocks_extracted
+        SYSTEM_STATS["total_tables_detected"] += doc.stats.tables_detected
+        return doc
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sample processing failed: {str(e)}")
 
 
 @app.get("/api/v1/documents")

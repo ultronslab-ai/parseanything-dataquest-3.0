@@ -121,35 +121,68 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPreviousFiles();
 });
 
+let isProcessingFile = false;
+
 function setupEventListeners() {
   // File Upload Handlers
-  elements.btnBrowse.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.fileInput.click();
-  });
-  elements.dropzone.addEventListener('click', () => elements.fileInput.click());
+  if (elements.fileInput) {
+    // Crucial: stop propagation on fileInput click so it does NOT bubble up to dropzone
+    // and trigger an infinite programmatic click recursion that browsers block!
+    elements.fileInput.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
 
-  elements.fileInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFileUpload(e.target.files[0]);
-    }
-  });
+    elements.fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleFileUpload(e.target.files[0]);
+      }
+    });
+  }
 
-  elements.dropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.add('dragover');
-  });
+  if (elements.btnBrowse) {
+    elements.btnBrowse.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (elements.fileInput) elements.fileInput.click();
+    });
+  }
 
-  elements.dropzone.addEventListener('dragleave', () => {
-    elements.dropzone.classList.remove('dragover');
-  });
+  if (elements.dropzone) {
+    elements.dropzone.addEventListener('click', (e) => {
+      // Only invoke programmatic click if the user didn't already click directly on the fileInput
+      if (e.target !== elements.fileInput && elements.fileInput) {
+        elements.fileInput.click();
+      }
+    });
 
-  elements.dropzone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.remove('dragover');
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileUpload(e.dataTransfer.files[0]);
-    }
+    elements.dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      elements.dropzone.classList.add('dragover');
+    });
+
+    elements.dropzone.addEventListener('dragleave', () => {
+      elements.dropzone.classList.remove('dragover');
+    });
+
+    elements.dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      elements.dropzone.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFileUpload(e.dataTransfer.files[0]);
+      }
+    });
+  }
+
+  // 1-Click Sample Demo Buttons
+  document.querySelectorAll('.demo-sample-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const sample = btn.getAttribute('data-sample');
+      if (sample) {
+        await handleSampleIngest(sample);
+      }
+    });
   });
 
   // Download Handlers
@@ -238,7 +271,20 @@ function setPipelineStage(stage) {
 // ============================================================================
 
 async function handleFileUpload(file) {
+  if (!file || isProcessingFile) return;
+  isProcessingFile = true;
+
+  // Immediate UI feedback
+  if (elements.bannerFilename) elements.bannerFilename.innerText = file.name;
+  if (elements.bannerStatus) {
+    elements.bannerStatus.innerText = 'PROCESSING...';
+    elements.bannerStatus.className = 'badge badge-accent';
+  }
+  if (elements.bannerMeta) {
+    elements.bannerMeta.innerText = `Ingesting ${file.name} (${(file.size / 1024).toFixed(1)} KB)...`;
+  }
   setPipelineStage('upload');
+
   const formData = new FormData();
   formData.append('file', file);
 
@@ -252,8 +298,15 @@ async function handleFileUpload(file) {
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || 'Upload failed');
+      let errMsg = `Upload failed with HTTP ${res.status}`;
+      try {
+        const err = await res.json();
+        if (err && err.detail) errMsg = err.detail;
+      } catch (_) {
+        const text = await res.text().catch(() => '');
+        if (text) errMsg = `${errMsg}: ${text.slice(0, 100)}`;
+      }
+      throw new Error(errMsg);
     }
 
     setPipelineStage('assemble');
@@ -264,13 +317,93 @@ async function handleFileUpload(file) {
     if (doc.processing_status === 'failed') {
       const errMsg = (doc.errors && doc.errors.length > 0) ? doc.errors[0].message : 'Unsupported or corrupted document format.';
       alert(`Processing Failed: ${errMsg}`);
+      if (elements.bannerStatus) {
+        elements.bannerStatus.innerText = 'FAILED';
+        elements.bannerStatus.className = 'badge badge-danger';
+      }
       return;
     }
 
     renderDocument(doc);
+    loadPreviousFiles();
   } catch (error) {
+    console.error('Upload error:', error);
     alert(`Upload error: ${error.message}`);
+    if (elements.bannerStatus) {
+      elements.bannerStatus.innerText = 'ERROR';
+      elements.bannerStatus.className = 'badge badge-danger';
+    }
     setPipelineStage('upload');
+  } finally {
+    isProcessingFile = false;
+    // Always clear input value so selecting the same file triggers 'change' every time!
+    if (elements.fileInput) {
+      elements.fileInput.value = '';
+    }
+  }
+}
+
+async function handleSampleIngest(filename) {
+  if (isProcessingFile) return;
+  isProcessingFile = true;
+
+  if (elements.bannerFilename) elements.bannerFilename.innerText = filename;
+  if (elements.bannerStatus) {
+    elements.bannerStatus.innerText = 'INGESTING SAMPLE...';
+    elements.bannerStatus.className = 'badge badge-accent';
+  }
+  if (elements.bannerMeta) {
+    elements.bannerMeta.innerText = `Ingesting bundled sample ${filename}...`;
+  }
+  setPipelineStage('upload');
+
+  try {
+    setPipelineStage('detect');
+    setTimeout(() => setPipelineStage('extract'), 150);
+
+    const res = await fetch(`/api/v1/documents/sample/${encodeURIComponent(filename)}`, {
+      method: 'POST'
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to process sample (HTTP ${res.status})`;
+      try {
+        const err = await res.json();
+        if (err && err.detail) errMsg = err.detail;
+      } catch (_) {
+        const text = await res.text().catch(() => '');
+        if (text) errMsg = `${errMsg}: ${text.slice(0, 100)}`;
+      }
+      throw new Error(errMsg);
+    }
+
+    setPipelineStage('assemble');
+    const doc = await res.json();
+    setPipelineStage('verify');
+    setTimeout(() => setPipelineStage('done'), 200);
+
+    if (doc.processing_status === 'failed') {
+      const errMsg = (doc.errors && doc.errors.length > 0) ? doc.errors[0].message : 'Failed to ingest sample document.';
+      alert(`Processing Failed: ${errMsg}`);
+      if (elements.bannerStatus) {
+        elements.bannerStatus.innerText = 'FAILED';
+        elements.bannerStatus.className = 'badge badge-danger';
+      }
+      return;
+    }
+
+    renderDocument(doc);
+    loadPreviousFiles();
+  } catch (error) {
+    console.error('Sample ingestion error:', error);
+    alert(`Sample error: ${error.message}`);
+    if (elements.bannerStatus) {
+      elements.bannerStatus.innerText = 'ERROR';
+      elements.bannerStatus.className = 'badge badge-danger';
+    }
+    setPipelineStage('upload');
+  } finally {
+    isProcessingFile = false;
   }
 }
 
